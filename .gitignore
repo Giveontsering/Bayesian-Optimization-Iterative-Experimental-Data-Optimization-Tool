@@ -1,0 +1,25 @@
+# ===== 运行时数据（用户实验数据，不纳入版本库） =====
+data/*
+!data/.gitkeep
+
+# ===== 历史截图 / 内部产物 =====
+_shots/
+
+# ===== Python（server.py 参考实现） =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ===== 编辑器 / 系统 =====
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===== 临时 / 日志 =====
+*.log
+tmp/

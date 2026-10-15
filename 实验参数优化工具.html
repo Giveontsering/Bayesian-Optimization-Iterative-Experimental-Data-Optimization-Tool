@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>实验参数优化迭代工具</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%230f1b2d'/%3E%3Cpath d='M6 16l4-6 3 4 3-7' stroke='%2337d0c8' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='7' r='1.6' fill='%2337d0c8'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#eef1f6; --card:#ffffff; --line:#dfe4ec; --ink:#1c2536; --sub:#5b6779;
+    --brand:#0f1b2d; --accent:#0e9c94; --accent2:#2563eb; --ok:#15803d; --warn:#b45309; --danger:#b91c1c;
+    --radius:10px; --shadow:0 1px 3px rgba(15,27,45,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Microsoft YaHei UI","PingFang SC","Noto Sans SC",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    font-size:14px; line-height:1.55;
+  }
+  button{font-family:inherit}
+  input,select,textarea{font-family:inherit; font-size:16px; color:var(--ink)}
+  h1,h2,h3{margin:0; font-weight:600}
+  /* 顶栏 */
+  header{
+    background:var(--brand); color:#eaf2ff; padding:12px 16px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  }
+  header h1{font-size:17px; letter-spacing:.5px; display:flex; align-items:center; gap:8px}
+  header .logo{width:26px;height:26px;border-radius:6px;background:rgba(55,208,200,.16);display:flex;align-items:center;justify-content:center}
+  header .tag{font-size:12px;color:#9db2d8}
+  header .hbtns{margin-left:auto; display:flex; gap:6px; flex-wrap:wrap; align-items:center}
+  .btn{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    border-radius:7px; padding:7px 12px; cursor:pointer; font-size:13.5px;
+    transition:background .15s, border-color .15s, transform .05s;
+  }
+  .btn:hover{background:#f4f7fb; border-color:#c4cddb}
+  .btn:active{transform:translateY(1px)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+  .btn.primary:hover{background:#0b8680}
+  .btn.ghost{background:transparent;border-color:rgba(255,255,255,.35);color:#eaf2ff}
+  .btn.ghost:hover{background:rgba(255,255,255,.1)}
+  .btn.small{padding:4px 9px; font-size:12.5px}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+  /* 后端状态 */
+  .bstat{display:flex; align-items:center; gap:6px; font-size:12px; color:#9db2d8}
+  .bstat .dot{width:9px;height:9px;border-radius:50%;background:#5b6779}
+  .bstat.on .dot{background:#37d0c8; box-shadow:0 0 6px rgba(55,208,200,.8)}
+  .bstat.err .dot{background:#f87171}
+  /* 主布局 */
+  main{
+    display:grid; grid-template-columns:1fr; gap:14px; padding:14px;
+    max-width:1560px; margin:0 auto;
+  }
+  main > *{min-width:0}
+  .panel{min-width:0}
+  @media (min-width:700px){ main{grid-template-columns:300px 1fr} }
+  @media (min-width:1180px){ main{grid-template-columns:300px 1fr 360px} }
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px}
+  .panel h2{font-size:14px; color:var(--brand); margin-bottom:10px; display:flex; align-items:center; gap:6px}
+  .panel h2 .hint{font-size:11px; color:var(--sub); font-weight:400}
+  .sec{margin-bottom:14px}
+  .sec:last-child{margin-bottom:0}
+  .sec-title{font-size:12px; font-weight:600; color:var(--sub); margin:10px 0 6px; letter-spacing:.3px}
+  /* 配置表单 */
+  .cfg-row{display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-bottom:6px; align-items:center}
+  .cfg-row label{font-size:12.5px; color:var(--sub)}
+  .cfg-row input,.cfg-row select{width:100%; border:1px solid var(--line); border-radius:6px; padding:5px 7px; background:#fafbfd}
+  .cfg-row input:focus,.cfg-row select:focus{outline:none; border-color:var(--accent)}
+  .param-item,.obj-item{border:1px dashed var(--line); border-radius:8px; padding:8px; margin-bottom:8px; background:#fafbfe}
+  .param-head,.obj-head{display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px}
+  .param-head input{flex:1; min-width:0; border:1px solid var(--line); border-radius:6px; padding:4px 7px; font-size:13.5px; font-weight:600; background:#fff}
+  .param-head input:focus{outline:none; border-color:var(--accent)}
+  .obj-head b{font-size:12.5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .mini-btn{border:1px solid var(--line);background:#fff;border-radius:5px;font-size:11.5px;color:var(--sub);padding:2px 6px;cursor:pointer;white-space:nowrap}
+  .mini-btn:hover{color:var(--danger);border-color:var(--danger)}
+  .add-btn{width:100%; border:1px dashed #b9c4d4; background:#f7f9fc; color:var(--accent2); border-radius:7px; padding:6px; font-size:13px; cursor:pointer}
+  .add-btn:hover{background:#eef4ff}
+  .model-opts{display:grid; gap:6px}
+  .model-opts label{display:flex; align-items:center; gap:6px; font-size:13px; padding:6px 8px; border:1px solid var(--line); border-radius:7px; cursor:pointer}
+  .model-opts label.on{border-color:var(--accent); background:#effaf9}
+  .model-opts input{accent-color:var(--accent)}
+  .model-note{font-size:11.5px; color:var(--sub); margin-top:6px; line-height:1.5}
+  /* 数据区 */
+  .data-wrap{display:flex; flex-direction:column; gap:12px}
+  .tbl-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:8px; max-width:100%}
+  table{border-collapse:collapse; table-layout:fixed; width:100%; font-size:12.8px; min-width:560px; max-width:100%}
+  th{background:#f2f5fa; color:var(--sub); font-weight:600; padding:6px 7px; border-bottom:1px solid var(--line); text-align:left; white-space:nowrap}
+  td{padding:5px 7px; border-bottom:1px solid #edf0f5; white-space:nowrap}
+  tbody tr:hover{background:#f8fafd}
+  td input{width:100%; border:1px solid transparent; background:transparent; padding:3px 4px; border-radius:5px; font-size:13px}
+  td input:focus{outline:none; border-color:var(--accent); background:#fff}
+  .add-form{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; padding:10px; background:#f6f9fd; border:1px dashed #c7d1e0; border-radius:9px}
+  .add-form label{font-size:12px; color:var(--sub); display:block; margin-bottom:2px}
+  .add-form input,.add-form select{width:100%; border:1px solid var(--line); border-radius:6px; padding:6px 8px; background:#fff}
+  .add-form .add-actions{display:flex; align-items:flex-end; gap:6px; grid-column:1/-1; flex-wrap:wrap}
+  .csv-bar{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+  .csv-bar input[type=file]{display:none}
+  /* 操作与结果 */
+  .ops{display:flex; flex-direction:column; gap:12px}
+  .big-actions{display:grid; gap:8px}
+  .big-actions .btn{padding:11px; font-size:14px}
+  .result-card{background:linear-gradient(160deg,#0f1b2d,#13264a); color:#eaf2ff; border-radius:var(--radius); padding:14px}
+  .result-card h3{font-size:13px; color:#7fd7d0; margin-bottom:10px}
+  .rec-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px}
+  .rec-item{background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.14); border-radius:8px; padding:8px 9px}
+  .rec-item .k{font-size:11.5px; color:#a9bcdc}
+  .rec-item .v{font-size:15px; font-weight:600; margin-top:2px; color:#fff}
+  .rec-item .u{font-size:11px; color:#8fa7c9}
+  .hintbox{font-size:12.5px; color:var(--sub); background:#f6f9fd; border-radius:8px; padding:9px 11px}
+  .statline{font-size:12.5px; color:var(--sub)}
+  .statline b{color:var(--ink)}
+  .chart-box{background:#fff; border:1px solid var(--line); border-radius:8px; padding:8px; min-width:0; overflow:hidden}
+  .chart-box svg{display:block; width:100%; height:auto; max-width:100%; min-width:0}
+  .hist{max-height:210px; overflow-y:auto; font-size:12px}
+  .hist div{padding:5px 0; border-bottom:1px dashed #edf0f5; color:var(--sub)}
+  .hist b{color:var(--ink)}
+  .toast{
+    position:fixed; left:50%; bottom:22px; transform:translateX(-50%);
+    background:var(--brand); color:#fff; padding:9px 16px; border-radius:8px; font-size:13px;
+    box-shadow:0 4px 14px rgba(0,0,0,.25); opacity:0; pointer-events:none; transition:opacity .2s;
+    z-index:99; max-width:88vw;
+  }
+  .toast.show{opacity:1}
+  .toast.err{background:var(--danger)}
+  .empty-tip{color:#93a0b5; font-size:13px; text-align:center; padding:22px 10px}
+  @media (max-width:700px){
+    .param-head input, td input, .cfg-row input, .cfg-row select, .add-form input, .add-form select{font-size:16px}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#37d0c8" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16l4-6 3 4 3-7"/><circle cx="16" cy="7" r="1.6"/></svg></span>实验参数优化迭代工具</h1>
+  <span class="tag">贝叶斯优化 · 多目标 · 高斯过程（浏览器本地）</span>
+  <div class="hbtns">
+    <button class="btn ghost" id="importBtn" type="button">导入 CSV</button>
+    <button class="btn ghost" id="exportBtn" type="button">导出 CSV</button>
+    <button class="btn ghost" id="resetBtn" type="button">重置示例</button>
+    <input type="file" id="fileInput" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+  </div>
+</header>
+
+<main>
+  <!-- ===== 左：配置 ===== -->
+  <aside class="panel">
+    <h2>参数与目标 <span class="hint">定义搜索空间与目标</span></h2>
+    <div class="sec">
+      <div class="sec-title">实验参数（自变量，可改名）</div>
+      <div id="paramList"></div>
+      <button class="add-btn" id="addParamBtn" type="button">+ 添加参数</button>
+    </div>
+    <div class="sec">
+      <div class="sec-title">目标（因变量，可多目标）</div>
+      <div id="objList"></div>
+      <button class="add-btn" id="addObjBtn" type="button">+ 添加目标</button>
+    </div>
+  </aside>
+
+  <!-- ===== 中：数据 ===== -->
+  <section class="data-wrap panel">
+    <h2>实验数据 <span class="hint">每一行是一次实验</span></h2>
+    <div class="csv-bar">
+      <span class="statline" id="dataStat">暂无数据</span>
+      <button class="btn small" id="pickTargetBtn" type="button">把某列设为目标</button>
+    </div>
+    <div class="tbl-scroll">
+      <table id="dataTable">
+        <colgroup id="dataCols"></colgroup>
+        <thead id="dataHead"></thead>
+        <tbody id="dataBody"></tbody>
+      </table>
+    </div>
+    <div class="sec-title">加入一次新实验（参数 → 实测结果）</div>
+    <div class="add-form" id="addForm"></div>
+  </section>
+
+  <!-- ===== 右：模型 / 操作 / 结果 ===== -->
+  <section class="ops">
+    <div class="panel">
+      <h2>优化模型</h2>
+      <div class="model-opts" id="modelOpts">
+        <label><input type="radio" name="model" value="gp" checked> 高斯过程（传统贝叶斯，本地计算）</label>
+      </div>
+      <div class="model-note" id="modelNote">高斯过程（GP）在浏览器本地计算：无需安装 Python、无需联网，实验数据不离开本机。</div>
+      <div class="sec-title">模型参数</div>
+      <div class="cfg-row"><label>采集函数</label>
+        <select id="acqSel"><option value="ei">期望改进 EI</option><option value="ucb">上置信界 UCB</option></select>
+      </div>
+      <div class="cfg-row"><label>候选采样数</label><input id="nCand" type="number" value="1500" min="200" step="100"></div>
+      <div class="cfg-row"><label>GP 噪声 σ</label><input id="gpNoise" type="number" value="0.01" min="0.0001" step="0.005"></div>
+    </div>
+
+    <div class="big-actions">
+      <button class="btn primary" id="recommendBtn" type="button">更新模型并推荐最优参数</button>
+      <button class="btn" id="predictBtn" type="button">输入参数 → 预测性能</button>
+    </div>
+
+    <div class="result-card" id="resultCard" hidden>
+      <h3 id="resultTitle">推荐的最优参数</h3>
+      <div class="rec-grid" id="recGrid"></div>
+      <div class="statline" style="color:#a9bcdc;margin-top:8px" id="recStats"></div>
+      <div style="margin-top:10px"><button class="btn" id="fillRecBtn" type="button" style="width:100%;background:rgba(255,255,255,.12);color:#eaf2ff;border-color:rgba(255,255,255,.25)">用推荐参数预填新增实验行 →</button></div>
+    </div>
+
+    <div class="panel">
+      <h2>分析图</h2>
+      <div class="sec-title">优化收敛曲线</div>
+      <div class="chart-box" id="convChart"></div>
+      <div class="sec-title">双目标 Pareto 前沿（2 目标时）</div>
+      <div class="chart-box" id="paretoChart"></div>
+    </div>
+
+    <div class="panel">
+      <h2>迭代历史</h2>
+      <div class="hist" id="histBox"></div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* ===== 状态 ===== */
+var State = {
+  params: [],      // {name, type:'num'|'cat', min, max, cats:[]}
+  objs: [],        // {name, dir:'max'|'min', weight}
+  rows: [],        // {p:{paramName:value}, o:{objName:value}}
+  history: [],     // {params, pred, iter}
+  model: null,     // GP 训练后的模型
+  fitted: false,
+  iteration: 0
+};
+
+/* ===== 小工具 ===== */
+function $(id){ return document.getElementById(id); }
+function toast(msg, isErr){
+  var t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(function(){ t.className = 'toast'; }, 2600);
+}
+function num(x){ var n = parseFloat(x); return isFinite(n) ? n : null; }
+function fmt(x, d){
+  if (x === null || x === undefined || !isFinite(x)) return '—';
+  d = d === undefined ? 4 : d;
+  return (+x).toFixed(d);
+}
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function uid(){ return 'u' + Math.random().toString(36).slice(2,8); }
+
+/* ===== 矩阵运算（正定求解） ===== */
+var MathX = {
+  chol: function(A){
+    var n = A.length, L = [];
+    for (var i = 0; i < n; i++){
+      L[i] = [];
+      for (var j = 0; j <= i; j++){
+        var s = A[i][j];
+        for (var kk = 0; kk < j; kk++) s -= L[i][kk] * L[j][kk];
+        if (i === j){
+          if (s <= 1e-12) s = 1e-10;
+          L[i][j] = Math.sqrt(s);
+        } else {
+          L[i][j] = s / L[j][j];
+        }
+      }
+    }
+    return L;
+  },
+  solveLower: function(L, b){
+    var n = L.length, x = b.slice();
+    for (var i = 0; i < n; i++){
+      var s = x[i];
+      for (var j = 0; j < i; j++) s -= L[i][j] * x[j];
+      x[i] = s / L[i][i];
+    }
+    return x;
+  },
+  solveUpper: function(L, b){
+    var n = L.length, x = b.slice();
+    for (var i = n - 1; i >= 0; i--){
+      var s = x[i];
+      for (var j = i + 1; j < n; j++) s -= L[j][i] * x[j];
+      x[i] = s / L[i][i];
+    }
+    return x;
+  },
+  solveSym: function(A, b){
+    var L = MathX.chol(A);
+    var y = MathX.solveLower(L, b);
+    return MathX.solveUpper(L, y);
+  }
+};
+
+/* ===== 特征编码 ===== */
+function encodeParams(paramsDef, p){
+  var vec = [];
+  for (var i = 0; i < paramsDef.length; i++){
+    var prm = paramsDef[i];
+    var v = p[prm.name];
+    if (prm.type === 'num'){
+      var span = (prm.max - prm.min);
+      vec.push(span > 0 ? (v - prm.min) / span : 0.5);
+    } else {
+      var found = false;
+      for (var c = 0; c < prm.cats.length; c++){
+        if (prm.cats[c] === String(v)){ vec.push(1); found = true; }
+        else vec.push(0);
+      }
+      if (!found){ vec[0] = 1; }
+    }
+  }
+  return vec;
+}
+function encodeAll(paramsDef, rows){
+  var X = [];
+  for (var r = 0; r < rows.length; r++) X.push(encodeParams(paramsDef, rows[r].p));
+  return X;
+}
+
+/* ===== 目标归一化（转最大化，标准化） ===== */
+function transformY(objDef, rows){
+  var raw = [];
+  for (var r = 0; r < rows.length; r++){
+    var y = +rows[r].o[objDef.name];
+    var v = (objDef.dir === 'max') ? y : -y;
+    raw.push(v);
+  }
+  var mean = 0, i;
+  for (i = 0; i < raw.length; i++) mean += raw[i];
+  mean /= raw.length;
+  var sd = 0;
+  for (i = 0; i < raw.length; i++) sd += (raw[i] - mean) * (raw[i] - mean);
+  sd = Math.sqrt(sd / raw.length) || 1;
+  var yt = [];
+  for (i = 0; i < raw.length; i++) yt.push((raw[i] - mean) / sd);
+  return { y: yt, mean: mean, sd: sd };
+}
+function untransform(objDef, mu, sd){
+  var raw = mu * State._objT[objDef.name].sd + State._objT[objDef.name].mean;
+  return (objDef.dir === 'max') ? raw : -raw;
+}
+
+/* ===== 高斯过程回归（RBF 核，浏览器本地） ===== */
+function fitGP(X, y, sigma){
+  var n = X.length, d = X[0].length;
+  var lengthScale = 0.5;
+  function kern(x1, x2){
+    var s = 0;
+    for (var k = 0; k < d; k++){
+      var diff = x1[k] - x2[k];
+      s += diff * diff;
+    }
+    return Math.exp(-s / (2 * lengthScale * lengthScale));
+  }
+  var K = [];
+  for (var i = 0; i < n; i++){
+    K[i] = [];
+    for (var j = 0; j < n; j++){
+      K[i][j] = kern(X[i], X[j]);
+      if (i === j) K[i][j] += sigma * sigma;
+    }
+  }
+  var alpha;
+  try { alpha = MathX.solveSym(K, y.slice()); }
+  catch (e){ alpha = y.slice(); }
+  return {
+    predict: function(x){
+      var kstar = [], kstarstar = kern(x, x);
+      for (var i = 0; i < n; i++) kstar.push(kern(x, X[i]));
+      var mu = 0;
+      for (var i = 0; i < n; i++) mu += kstar[i] * alpha[i];
+      var v = MathX.solveSym(K, kstar);
+      var varv = kstarstar;
+      for (var i = 0; i < n; i++) varv -= kstar[i] * v[i];
+      if (varv < 1e-12) varv = 1e-12;
+      return { mu: mu, var: varv, sigma: Math.sqrt(varv) };
+    }
+  };
+}
+
+/* ===== 采集函数 ===== */
+function erf(x){
+  var sign = x >= 0 ? 1 : -1; x = Math.abs(x);
+  var a1=0.254829592,a2=-0.284496736,a3=1.421413741,a4=-1.453152027,a5=1.061405429,p=0.3275911;
+  var t = 1 / (1 + p * x);
+  var y = 1 - (((((a5*t+a4)*t)+a3)*t+a2)*t+a1)*t*Math.exp(-x*x);
+  return sign * y;
+}
+function acquisitionValue(model, x, acq, best){
+  var p = model.predict(x);
+  if (acq === 'ucb') return p.mu + 2.0 * p.sigma;
+  var xi = 0.01;
+  var z = (p.mu - best - xi) / (p.sigma || 1e-9);
+  var phi = Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
+  var Phi = 0.5 * (1 + erf(z / Math.SQRT2));
+  return (p.mu - best - xi) * Phi + p.sigma * phi;
+}
+
+/* ===== 候选采样 ===== */
+function sampleParams(paramsDef, n){
+  var pts = [];
+  var m = Math.floor(n / 3);
+  for (var k = 0; k < m; k++){
+    var p = {};
+    for (var i = 0; i < paramsDef.length; i++){
+      var prm = paramsDef[i];
+      if (prm.type === 'num'){
+        var cell = (k + Math.random()) / m;
+        p[prm.name] = prm.min + cell * (prm.max - prm.min);
+      } else {
+        p[prm.name] = prm.cats[Math.floor(Math.random() * prm.cats.length)];
+      }
+    }
+    pts.push(p);
+  }
+  for (var k2 = 0; k2 < n - m; k2++){
+    var p2 = {};
+    for (var i = 0; i < paramsDef.length; i++){
+      var prm2 = paramsDef[i];
+      if (prm2.type === 'num'){
+        p2[prm2.name] = prm2.min + Math.random() * (prm2.max - prm2.min);
+      } else {
+        p2[prm2.name] = prm2.cats[Math.floor(Math.random() * prm2.cats.length)];
+      }
+    }
+    pts.push(p2);
+  }
+  return pts;
+}
+function perturb(p, paramsDef, scale){
+  var q = {};
+  for (var i = 0; i < paramsDef.length; i++){
+    var prm = paramsDef[i];
+    if (prm.type === 'num'){
+      var span = prm.max - prm.min;
+      var v = p[prm.name] + (Math.random() * 2 - 1) * span * scale;
+      q[prm.name] = Math.max(prm.min, Math.min(prm.max, v));
+    } else {
+      q[prm.name] = prm.cats[Math.floor(Math.random() * prm.cats.length)];
+    }
+  }
+  return q;
+}
+
+/* ===== GP 本地优化 ===== */
+function buildGPModels(){
+  var sigma = num($('gpNoise').value); if (sigma === null || sigma <= 0) sigma = 0.01;
+  var X = encodeAll(State.params, State.rows);
+  var models = {};
+  State._objT = {};
+  for (var i = 0; i < State.objs.length; i++){
+    var obj = State.objs[i];
+    var ty = transformY(obj, State.rows);
+    State._objT[obj.name] = ty;
+    models[obj.name] = fitGP(X, ty.y, sigma);
+  }
+  State.model = { type: 'gp', models: models };
+  State.fitted = true;
+}
+function bestSeen(obj){
+  var ty = State._objT[obj.name];
+  var best = -Infinity;
+  for (var i = 0; i < ty.y.length; i++) best = Math.max(best, ty.y[i]);
+  return best;
+}
+function compositeAcq(x, acq){
+  var total = 0, wsum = 0;
+  for (var i = 0; i < State.objs.length; i++){
+    var obj = State.objs[i];
+    var m = State.model.models[obj.name];
+    var a = acquisitionValue(m, x, acq, bestSeen(obj));
+    total += obj.weight * a;
+    wsum += obj.weight;
+  }
+  return wsum > 0 ? total / wsum : total;
+}
+function optimizeGP(){
+  var acq = $('acqSel').value;
+  var nCand = Math.min(6000, Math.max(200, num($('nCand').value) || 1500));
+  var cands = sampleParams(State.params, nCand);
+  var scored = [];
+  for (var i = 0; i < cands.length; i++){
+    var x = encodeParams(State.params, cands[i]);
+    scored.push({ p: cands[i], a: compositeAcq(x, acq) });
+  }
+  scored.sort(function(a, b){ return b.a - a.a; });
+  var top = scored.slice(0, 5);
+  for (var t = 0; t < top.length; t++){
+    for (var it = 0; it < 60; it++){
+      var q = perturb(top[t].p, State.params, 0.03);
+      var xq = encodeParams(State.params, q);
+      var aq = compositeAcq(xq, acq);
+      if (aq > top[t].a){ top[t].p = q; top[t].a = aq; }
+    }
+  }
+  top.sort(function(a, b){ return b.a - a.a; });
+  var best = top[0].p;
+  var preds = {};
+  var xb = encodeParams(State.params, best);
+  for (var i = 0; i < State.objs.length; i++){
+    var obj = State.objs[i];
+    var pm = State.model.models[obj.name].predict(xb);
+    preds[obj.name] = {
+      mu: untransform(obj, pm.mu, pm.sigma),
+      sd: pm.sigma * State._objT[obj.name].sd
+    };
+  }
+  var out = { params: best, preds: preds, modelType: 'gp' };
+  // 多目标：在候选集上计算代理预测的 Pareto 前沿（knee 推荐之外的权衡视图）
+  if (State.objs.length > 1){
+    out.mode = 'pareto';
+    out.frontier = gpParetoFrontier();
+    out.frontierSize = out.frontier ? out.frontier.length : 0;
+  } else {
+    out.mode = 'single'; out.frontier = []; out.frontierSize = 0;
+  }
+  return out;
+}
+
+/* 本地 GP 的 Pareto 前沿（加权 top-N 候选内做非支配排序，采样 ≤ 220 点返回） */
+function gpParetoFrontier(){
+  var nCand = Math.min(3000, Math.max(200, num($('nCand').value) || 1500));
+  var cands = sampleParams(State.params, nCand);
+  var scored = [];
+  for (var i = 0; i < cands.length; i++){
+    var x = encodeParams(State.params, cands[i]);
+    var s = 0, ws = 0;
+    State.objs.forEach(function(obj){
+      var pm = State.model.models[obj.name].predict(x);
+      var ty = State._objT[obj.name];
+      var raw = pm.mu * ty.sd + ty.mean;
+      s += obj.weight * (obj.dir === 'max' ? raw : -raw);
+      ws += obj.weight;
+    });
+    scored.push({ p: cands[i], x: x, s: ws ? s / ws : 0 });
+  }
+  scored.sort(function(a, b){ return b.s - a.s; });
+  var top = scored.slice(0, 800);
+  var vals = top.map(function(t){
+    return State.objs.map(function(obj){
+      var pm = State.model.models[obj.name].predict(t.x);
+      var ty = State._objT[obj.name];
+      var raw = pm.mu * ty.sd + ty.mean;
+      return obj.dir === 'max' ? raw : -raw;
+    });
+  });
+  var kept = [];
+  for (var i = 0; i < top.length; i++){
+    var dominated = false;
+    for (var j = 0; j < top.length && !dominated; j++){
+      if (i === j) continue;
+      var better = true, strict = false;
+      for (var k = 0; k < vals[j].length; k++){
+        if (vals[j][k] < vals[i][k]){ better = false; break; }
+        if (vals[j][k] > vals[i][k]) strict = true;
+      }
+      if (better && strict) dominated = true;
+    }
+    if (!dominated) kept.push(i);
+  }
+  var fvals = kept.map(function(i){ return vals[i]; });
+  fvals.sort(function(a, b){ return b[0] - a[0]; });
+  var step = Math.max(1, Math.ceil(fvals.length / 220));
+  var frontier = [];
+  for (var i = 0; i < fvals.length; i += step){
+    var t = top[kept[i]];
+    var fpreds = {};
+    State.objs.forEach(function(obj){
+      var pm = State.model.models[obj.name].predict(t.x);
+      var ty = State._objT[obj.name];
+      fpreds[obj.name] = {
+        mu: untransform(obj, pm.mu, pm.sigma),
+        sd: pm.sigma * ty.sd
+      };
+    });
+    frontier.push({ params: t.p, preds: fpreds });
+  }
+  return frontier;
+}
+
+/* ===== 示例数据 ===== */
+function demoData(){
+  State.params = [
+    { name: '温度', type: 'num', min: 20, max: 120 },
+    { name: '压力', type: 'num', min: 1, max: 10 },
+    { name: '催化剂', type: 'cat', cats: ['A', 'B', 'C'] }
+  ];
+  State.objs = [
+    { name: '产率', dir: 'max', weight: 1 },
+    { name: '成本', dir: 'min', weight: 1 }
+  ];
+  var rows = [];
+  var T = [30, 60, 90, 45, 110, 70, 85, 100, 55, 25];
+  var P = [3, 7, 5, 9, 2, 8, 4, 6, 1, 10];
+  var C = ['A', 'B', 'A', 'C', 'B', 'C', 'A', 'B', 'C', 'A'];
+  for (var i = 0; i < T.length; i++){
+    var catBoost = { A: 4, B: 0, C: 2 }[C[i]];
+    var yieldV = 72 + 12 * Math.sin((T[i] - 20) / 100 * 3.14) - 0.6 * Math.abs(P[i] - 5) + catBoost;
+    var costV = 30 + 0.35 * T[i] + 2.2 * P[i] + catBoost * 3;
+    rows.push({ p: { '温度': T[i], '压力': P[i], '催化剂': C[i] }, o: { '产率': +yieldV.toFixed(1), '成本': +costV.toFixed(1) } });
+  }
+  State.rows = rows;
+  State.history = [];
+  State.iteration = 0;
+  State.fitted = false;
+  State.model = null;
+}
+
+/* ===== 配置面板 ===== */
+function renderParams(){
+  var box = $('paramList'); box.innerHTML = '';
+  State.params.forEach(function(prm, idx){
+    var div = document.createElement('div');
+    div.className = 'param-item';
+    var type = prm.type;
+    div.innerHTML =
+      '<div class="param-head"><input data-nm="' + idx + '" value="' + escapeHtml(prm.name) + '" title="点击可改名">' +
+      '<button class="mini-btn" data-del="' + idx + '">删除</button></div>' +
+      '<div class="cfg-row"><label>类型</label><select data-f="type" data-idx="' + idx + '">' +
+      '<option value="num"' + (type==='num'?' selected':'') + '>连续数值</option>' +
+      '<option value="cat"' + (type==='cat'?' selected':'') + '>类别</option></select></div>' +
+      (type === 'num'
+        ? '<div class="cfg-row"><label>最小值</label><input data-f="min" data-idx="' + idx + '" type="number" value="' + prm.min + '"></div>' +
+          '<div class="cfg-row"><label>最大值</label><input data-f="max" data-idx="' + idx + '" type="number" value="' + prm.max + '"></div>'
+        : '<div class="cfg-row"><label>类别（逗号分隔）</label><input data-f="cats" data-idx="' + idx + '" type="text" value="' + prm.cats.join(',') + '"></div>');
+    box.appendChild(div);
+  });
+  bindParamEvents(box);
+}
+function renderObjs(){
+  var box = $('objList'); box.innerHTML = '';
+  State.objs.forEach(function(obj, idx){
+    var div = document.createElement('div');
+    div.className = 'obj-item';
+    div.innerHTML =
+      '<div class="obj-head"><b>' + escapeHtml(obj.name) + '</b>' +
+      '<button class="mini-btn" data-del-obj="' + idx + '">删除</button></div>' +
+      '<div class="cfg-row"><label>方向</label><select data-of="dir" data-idx="' + idx + '">' +
+      '<option value="max"' + (obj.dir==='max'?' selected':'') + '>越大越好</option>' +
+      '<option value="min"' + (obj.dir==='min'?' selected':'') + '>越小越好</option></select></div>' +
+      '<div class="cfg-row"><label>权重</label><input data-of="weight" data-idx="' + idx + '" type="number" step="0.1" min="0" value="' + obj.weight + '"></div>';
+    box.appendChild(div);
+  });
+  bindObjEvents(box);
+}
+function renameParam(idx, newName){
+  var prm = State.params[idx];
+  if (!prm) return;
+  newName = (newName || '').trim();
+  if (!newName){ renderParams(); return; }
+  if (newName === prm.name) return;
+  var old = prm.name;
+  // 目标里已有同名 → 拒绝
+  var conflict = State.objs.some(function(o){ return o.name === newName; });
+  if (conflict){ toast('目标中已有同名「' + newName + '」，请换一个', true); renderParams(); return; }
+  State.rows.forEach(function(r){
+    if (r.p[old] !== undefined){
+      r.p[newName] = r.p[old];
+      delete r.p[old];
+    }
+  });
+  prm.name = newName;
+  renderParams(); renderAddForm(); renderTable();
+  toast('参数已改名为「' + newName + '」');
+}
+function bindParamEvents(box){
+  box.querySelectorAll('input[data-nm]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      renameParam(+inp.dataset.nm, inp.value);
+    });
+    inp.addEventListener('keydown', function(ev){
+      if (ev.key === 'Enter'){ ev.target.blur(); }
+    });
+  });
+  box.querySelectorAll('[data-f="type"]').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      var idx = +sel.dataset.idx;
+      var prm = State.params[idx];
+      if (sel.value === 'cat' && prm.type === 'num'){
+        prm.type = 'cat';
+        prm.cats = prm.cats && prm.cats.length ? prm.cats : ['A', 'B'];
+        delete prm.min; delete prm.max;
+      } else if (sel.value === 'num' && prm.type === 'cat'){
+        prm.type = 'num';
+        prm.min = prm.min === undefined ? 0 : prm.min;
+        prm.max = prm.max === undefined ? 10 : prm.max;
+        delete prm.cats;
+      }
+      renderParams(); renderAddForm(); renderTable();    });
+  });
+  box.querySelectorAll('input[data-f="min"], input[data-f="max"]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      var idx = +inp.dataset.idx;
+      State.params[idx][inp.dataset.f] = num(inp.value) || 0;
+      if (State.params[idx].min > State.params[idx].max){
+        State.params[idx].max = State.params[idx].min;
+        renderParams();
+      }    });
+  });
+  box.querySelectorAll('input[data-f="cats"]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      var idx = +inp.dataset.idx;
+      var arr = inp.value.split(/[,，\s]+/).filter(function(s){ return s !== ''; });
+      State.params[idx].cats = arr.length ? arr : ['A', 'B'];
+      renderAddForm(); renderTable();    });
+  });
+  box.querySelectorAll('[data-del]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var idx = +btn.dataset.del;
+      var name = State.params[idx].name;
+      State.params.splice(idx, 1);
+      State.rows.forEach(function(r){ delete r.p[name]; });
+      renderParams(); renderAddForm(); renderTable();      toast('已删除参数「' + name + '」');
+    });
+  });
+}
+function bindObjEvents(box){
+  box.querySelectorAll('[data-of="dir"]').forEach(function(sel){
+    sel.addEventListener('change', function(){
+      State.objs[+sel.dataset.idx].dir = sel.value;    });
+  });
+  box.querySelectorAll('input[data-of="weight"]').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      var w = num(inp.value);
+      State.objs[+inp.dataset.idx].weight = (w === null || w < 0) ? 1 : w;    });
+  });
+  box.querySelectorAll('[data-del-obj]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var idx = +btn.dataset.delObj;
+      var name = State.objs[idx].name;
+      State.objs.splice(idx, 1);
+      State.rows.forEach(function(r){ delete r.o[name]; });
+      renderObjs(); renderAddForm(); renderTable();      toast('已删除目标「' + name + '」');
+    });
+  });
+}
+
+/* ===== 数据表 ===== */
+function renderTable(){
+  var head = $('dataHead'), body = $('dataBody'), cols = $('dataCols');
+  var pNames = State.params.map(function(p){ return p.name; });
+  var oNames = State.objs.map(function(o){ return o.name; });
+  var total = 1 + pNames.length + oNames.length;
+  cols.innerHTML = '';
+  var colDef = '<col style="width:28px">';
+  pNames.forEach(function(){ colDef += '<col style="width:auto">'; });
+  oNames.forEach(function(){ colDef += '<col style="width:auto">'; });
+  cols.innerHTML = colDef;
+  head.innerHTML = '<th></th>' + pNames.map(function(n){ return '<th>' + escapeHtml(n) + '</th>'; }).join('') +
+    oNames.map(function(n){ return '<th>' + escapeHtml(n) + '</th>'; }).join('');
+  if (State.rows.length === 0){
+    body.innerHTML = '<tr><td colspan="' + total + '"><div class="empty-tip">还没有数据：导入 CSV（自动读取表头），或在上方表单加入一次实验</div></td></tr>';
+  } else {
+    body.innerHTML = State.rows.map(function(row, ri){
+      var tds = '<td><button class="mini-btn" data-rdel="' + ri + '" title="删除此行">×</button></td>';
+      pNames.forEach(function(n){
+        var v = row.p[n];
+        var val = (v === undefined || v === null) ? '' : v;
+        tds += '<td><input data-cell="p" data-r="' + ri + '" data-k="' + escapeHtml(n) + '" value="' + escapeHtml(val) + '"></td>';
+      });
+      oNames.forEach(function(n){
+        var v = row.o[n];
+        var val = (v === undefined || v === null) ? '' : v;
+        tds += '<td><input data-cell="o" data-r="' + ri + '" data-k="' + escapeHtml(n) + '" value="' + escapeHtml(val) + '"></td>';
+      });
+      return '<tr>' + tds + '</tr>';
+    }).join('');
+  }
+  $('dataStat').innerHTML = '共 <b>' + State.rows.length + '</b> 条实验记录';
+  body.onclick = function(ev){
+    var t = ev.target;
+    if (t && t.dataset && t.dataset.rdel !== undefined){
+      State.rows.splice(+t.dataset.rdel, 1);
+      renderTable(); renderAddForm();      toast('已删除该行');
+    }
+  };
+  body.oninput = function(ev){
+    var t = ev.target;
+    if (t.dataset && t.dataset.cell){
+      var r = +t.dataset.r, key = t.dataset.k;
+      if (t.dataset.cell === 'p'){ State.rows[r].p[key] = t.value; }
+      else { State.rows[r].o[key] = t.value; }    }
+  };
+}
+function renderAddForm(){
+  var box = $('addForm');
+  var html = '';
+  State.params.forEach(function(prm, i){
+    html += '<div><label>' + escapeHtml(prm.name) + '</label>';
+    if (prm.type === 'num'){
+      html += '<input type="number" step="any" data-af-p="' + i + '" placeholder="' + prm.min + ' ~ ' + prm.max + '">';
+    } else {
+      html += '<select data-af-p="' + i + '">' + prm.cats.map(function(c){ return '<option>' + escapeHtml(c) + '</option>'; }).join('') + '</select>';
+    }
+    html += '</div>';
+  });
+  State.objs.forEach(function(obj, i){
+    html += '<div><label>' + escapeHtml(obj.name) + '</label><input type="number" step="any" data-af-o="' + i + '"></div>';
+  });
+  html += '<div class="add-actions"><button class="btn primary" id="addRowBtn" type="button">加入实验数据</button>' +
+    '<button class="btn" id="clearRowsBtn" type="button">清空数据</button></div>';
+  box.innerHTML = html;
+  $('addRowBtn').addEventListener('click', addRow);
+  $('clearRowsBtn').addEventListener('click', function(){
+    State.rows = []; State.history = []; State.iteration = 0; State.fitted = false; State.model = null;
+    State._lastFrontier = null; State._lastRecommended = null;
+    renderTable(); renderAddForm(); renderHistory(); $('resultCard').hidden = true;    toast('已清空数据');
+  });
+}
+function addRow(){
+  var p = {}, o = {};
+  var ok = true;
+  State.params.forEach(function(prm, i){
+    var el = document.querySelector('[data-af-p="' + i + '"]');
+    if (!el) return;
+    if (prm.type === 'num'){
+      var v = num(el.value);
+      if (v === null){ ok = false; toast('请填写参数「' + prm.name + '」的数值', true); return; }
+      v = Math.max(prm.min, Math.min(prm.max, v));
+      p[prm.name] = v;
+    } else {
+      p[prm.name] = el.value;
+    }
+  });
+  State.objs.forEach(function(obj, i){
+    var el = document.querySelector('[data-af-o="' + i + '"]');
+    if (!el) return;
+    var v = num(el.value);
+    if (v === null){ ok = false; toast('请填写目标「' + obj.name + '」的实测值', true); return; }
+    o[obj.name] = v;
+  });
+  if (!ok) return;
+  State.rows.push({ p: p, o: o });
+  renderTable();
+  recommendNow();
+}
+
+/* ===== CSV 导入导出 ===== */
+function exportCsv(){
+  var pNames = State.params.map(function(p){ return p.name; });
+  var oNames = State.objs.map(function(o){ return o.name; });
+  var lines = [pNames.concat(oNames).join(',')];
+  State.rows.forEach(function(r){
+    var arr = pNames.map(function(n){ return r.p[n]; }).concat(oNames.map(function(n){ return r.o[n]; }));
+    lines.push(arr.join(','));
+  });
+  var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '实验数据.csv';
+  document.body.appendChild(a); a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 500);
+  toast('已导出 ' + State.rows.length + ' 条数据');
+}
+function importCsv(text){
+  // ① 去掉 UTF-8 BOM（本工具导出的 CSV 自带 BOM，否则首列名会带 \ufeff 匹配不上）
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  // ② 编码检测：Excel 另存的 CSV 常为 GBK/ANSI，用 UTF-8 读会成乱码
+  if (/[\uFFFD]/.test(text)){
+    toast('文件不是 UTF-8 编码（常见于 Excel 另存的 GBK/ANSI 文件），列名无法解析。请用记事本打开后「另存为 → 编码选 UTF-8」，或复制本工具的「导出 CSV」模板', true);
+    return;
+  }
+  var lines = text.split(/\r?\n/).filter(function(l){ return l.trim() !== ''; });
+  if (lines.length < 2){ toast('CSV 内容过少', true); return; }
+  // ③ 自动检测分隔符：统计首行中 ; 、 , \t 的出现次数，取最多的
+  var firstLine = lines[0];
+  var seps = [';', '\t', ',', '，'];
+  var bestSep = ',', bestN = -1;
+  seps.forEach(function(s){
+    var n = firstLine.split(s).length - 1;
+    if (n > bestN){ bestN = n; bestSep = s; }
+  });
+  var splitLine = function(l){ return l.split(bestSep); };
+  // 表头保留原始位置（空列/合并单元格留下的空表头也占位，避免数据列错位）
+  var rawHeader = splitLine(firstLine).map(function(s){ return s.trim().replace(/^["']|["']$/g, ''); });
+  var colNames = [];
+  rawHeader.forEach(function(h){ if (h && colNames.indexOf(h) < 0) colNames.push(h); });
+  var dataRows = lines.slice(1).map(function(l){
+    var cells = splitLine(l).map(function(c){ return c.trim().replace(/^["']|["']$/g, ''); });
+    var row = {};
+    rawHeader.forEach(function(h, i){ if (h) row[h] = cells[i] !== undefined ? cells[i] : ''; });
+    return row;
+  });
+
+  // ★ 导入即替换：无论当前配置如何，总是按 CSV 表头重新生成参数/目标配置
+  // 先备份旧配置/数据，解析失败时原样恢复
+  var oldParams = State.params, oldObjs = State.objs, oldRows = State.rows;
+  State.params = []; State.objs = [];
+  colNames.forEach(function(h){
+    var vals = dataRows.map(function(r){ return r[h]; }).filter(function(v){ return v !== ''; });
+    var isNum = vals.length > 0 && vals.every(function(v){ return isFinite(parseFloat(v)); });
+    if (isNum){
+      var nums = vals.map(function(v){ return parseFloat(v); });
+      State.params.push({ name: h, type: 'num', min: Math.min.apply(null, nums), max: Math.max.apply(null, nums) });
+    } else {
+      var cats = [];
+      vals.forEach(function(v){ if (cats.indexOf(v) < 0) cats.push(v); });
+      State.params.push({ name: h, type: 'cat', cats: cats.length ? cats : ['A'] });
+    }
+  });
+  if (!State.params.length){
+    toast('CSV 未解析出任何参数列', true);
+    State.params = oldParams; State.objs = oldObjs;
+    return;
+  }
+  // 末列自动转成目标
+  var last = State.params.pop();
+  State.objs.push({ name: last.name, dir: 'max', weight: 1 });
+  renderParams(); renderObjs();
+
+  // 按新配置映射数据
+  var pNames = State.params.map(function(p){ return p.name; });
+  var oNames = State.objs.map(function(o){ return o.name; });
+  var newRows = [], skipped = 0;
+  dataRows.forEach(function(r){
+    var p = {}, o = {}, valid = true;
+    pNames.forEach(function(n){
+      var v = r[n];
+      if (v === undefined || v === ''){ valid = false; return; }
+      p[n] = isFinite(parseFloat(v)) ? parseFloat(v) : v;
+    });
+    oNames.forEach(function(n){
+      var v = r[n];
+      if (v === undefined || v === '' || !isFinite(parseFloat(v))){ valid = false; return; }
+      o[n] = parseFloat(v);
+    });
+    if (valid) newRows.push({ p: p, o: o });
+    else skipped++;
+  });
+  if (!newRows.length){
+    toast('未能解析出有效数据行（请检查 CSV 数据是否完整）', true);
+    State.params = oldParams; State.objs = oldObjs;
+    renderParams(); renderObjs();
+    return;
+  }
+  State.rows = newRows;   // ★ 直接替换当前数据集
+  State.history = []; State.iteration = 0; State.fitted = false; State.model = null;
+  State._lastFrontier = null; State._lastRecommended = null;
+  renderTable(); renderAddForm(); drawPareto(); drawConv();
+  toast('已导入并替换：' + newRows.length + ' 条数据 · 参数 ' + pNames.join('、') + ' · 目标「' + last.name + '」（方向可在左侧调整）' + (skipped ? '（跳过 ' + skipped + ' 行）' : ''));
+}
+function pickTarget(){
+  if (!State.params.length){ toast('没有可转换的参数列', true); return; }
+  var name = window.prompt('输入要设为目标的数据列名（将从此列转为目标列）：', State.params[State.params.length - 1].name);
+  if (!name) return;
+  var idx = -1;
+  State.params.forEach(function(p, i){ if (p.name === name) idx = i; });
+  if (idx < 0){ toast('未找到参数列「' + name + '」', true); return; }
+  if (State.objs.some(function(o){ return o.name === name; })){ toast('「' + name + '」已是目标列', true); return; }
+  var prm = State.params.splice(idx, 1)[0];
+  if (prm.type === 'cat'){ toast('类别列「' + name + '」不适合作为数值目标', true); State.params.push(prm); renderParams(); return; }
+  State.objs.push({ name: name, dir: 'max', weight: 1 });
+  State.rows.forEach(function(r){
+    r.o[name] = r.p[name];
+    delete r.p[name];
+  });
+  renderParams(); renderObjs(); renderAddForm(); renderTable();
+  toast('已将「' + name + '」设为目标（方向可在左侧调整）');
+}
+
+/* ===== 推荐 / 预测（GP 本地 · XGB/LGB 后端） ===== */
+function validateConfig(){
+  if (!State.params.length){ toast('请先添加至少一个参数', true); return false; }
+  if (!State.objs.length){ toast('请先添加至少一个目标', true); return false; }
+  if (State.rows.length < 2){ toast('至少需要 2 条实验数据才能建模（当前 ' + State.rows.length + ' 条）', true); return false; }
+  for (var i = 0; i < State.rows.length; i++){
+    for (var j = 0; j < State.objs.length; j++){
+      var v = State.rows[i].o[State.objs[j].name];
+      if (v === undefined || v === null || v === '' || !isFinite(parseFloat(v))){
+        toast('第 ' + (i + 1) + ' 行目标「' + State.objs[j].name + '」数值无效', true); return false;
+      }
+    }
+  }
+  return true;
+}
+function recommendNow(){
+  if (!validateConfig()) return;
+  buildGPModels();
+  var res = optimizeGP();
+  finishRecommend(res);
+}
+function finishRecommend(res){
+  State.iteration++;
+  State.history.push({ iter: State.iteration, params: res.params, preds: res.preds });
+  State._lastFrontier = res.frontier || null;
+  State._lastFrontierSize = res.frontierSize || (res.frontier ? res.frontier.length : 0);
+  State._lastMode = res.mode || 'single';
+  renderResult(res);
+  renderHistory();
+  drawConv();
+  drawPareto();
+  toast('模型已更新，推荐参数已生成（第 ' + State.iteration + ' 轮）');
+}
+function renderResult(res){
+  var card = $('resultCard');
+  card.hidden = false;
+  var typeLabel = '高斯过程（传统贝叶斯·本地）';
+  var modeTxt = State._lastMode === 'pareto' ? ' · 多目标 Pareto 权衡推荐' : '';
+  $('resultTitle').textContent = '第 ' + State.iteration + ' 轮推荐 · ' + typeLabel + modeTxt;
+  var html = '';
+  State.params.forEach(function(prm){
+    var v = res.params[prm.name];
+    html += '<div class="rec-item"><div class="k">' + escapeHtml(prm.name) + '</div>' +
+      '<div class="v">' + escapeHtml(String(v)) + '</div></div>';
+  });
+  $('recGrid').innerHTML = html;
+  var stat = '';
+  State.objs.forEach(function(obj){
+    var pr = res.preds[obj.name];
+    var dirTxt = obj.dir === 'max' ? '期望最大化' : '期望最小化';
+    stat += obj.name + '：预测 ' + fmt(pr.mu) + ' ± ' + fmt(pr.sd) + '（' + dirTxt + '）　';
+  });
+  if (State._lastMode === 'pareto' && State._lastFrontierSize){
+    stat += '<br>Pareto 前沿 ' + State._lastFrontierSize + ' 个权衡候选（见下图橙色点）';
+  }
+  $('recStats').innerHTML = stat;
+
+  // 一键填入推荐参数（用于做下一轮实验）
+  State._lastRecommended = res.params;
+}
+function renderHistory(){
+  var box = $('histBox');
+  if (!State.history.length){
+    box.innerHTML = '<div style="color:#93a0b5">暂无迭代记录。点击「更新模型并推荐最优参数」开始。</div>';
+    return;
+  }
+  box.innerHTML = State.history.map(function(h){
+    var pstr = State.params.map(function(prm){ return escapeHtml(prm.name) + '=' + escapeHtml(String(h.params[prm.name])); }).join('，');
+    var ostr = State.objs.map(function(obj){ return escapeHtml(obj.name) + '≈' + fmt(h.preds[obj.name].mu); }).join('，');
+    return '<div><b>第 ' + h.iter + ' 轮</b>　' + pstr + '　→　' + ostr + '</div>';
+  }).join('');
+}
+function runPredict(){
+  if (!validateConfig()) return;
+  var x = {};
+  var ok = true;
+  State.params.forEach(function(prm, i){
+    var el = document.querySelector('[data-pr-p="' + i + '"]');
+    if (!el) return;
+    if (prm.type === 'num'){
+      var v = num(el.value);
+      if (v === null){ ok = false; toast('请填写参数「' + prm.name + '」', true); return; }
+      x[prm.name] = v;
+    } else x[prm.name] = el.value;
+  });
+  if (!ok) return;
+  if (!State.fitted) buildGPModels();
+  var xe = encodeParams(State.params, x);
+  var preds = {};
+  State.objs.forEach(function(obj){
+    var pm = State.model.models[obj.name].predict(xe);
+    preds[obj.name] = {
+      mu: untransform(obj, pm.mu, pm.sigma),
+      sd: pm.sigma * State._objT[obj.name].sd
+    };
+  });
+  var html = '';
+  State.objs.forEach(function(obj){
+    var pr = preds[obj.name];
+    html += '<div class="rec-item"><div class="k">' + escapeHtml(obj.name) + '（预测）</div>' +
+      '<div class="v">' + fmt(pr.mu) + '</div><div class="u">± ' + fmt(pr.sd) + '</div></div>';
+  });
+  $('predOut').innerHTML = html;
+}
+
+/* ===== 图表（内联 SVG） ===== */
+function svgWrap(w, h, inner){
+  return '<svg viewBox="0 0 ' + w + ' ' + h + '" xmlns="http://www.w3.org/2000/svg" role="img">' + inner + '</svg>';
+}
+function drawConv(){
+  var box = $('convChart');
+  if (!State.history.length || !State.rows.length){
+    box.innerHTML = '<div class="empty-tip">生成首轮推荐后显示收敛曲线</div>';
+    return;
+  }
+  var loArr = [], spanArr = [];
+  State.objs.forEach(function(obj){
+    var vals = State.rows.map(function(r){ var y = +r.o[obj.name]; return obj.dir === 'max' ? y : -y; });
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    loArr.push(lo); spanArr.push((hi - lo) || 1);
+  });
+  var bests = State.history.map(function(h){
+    var s = 0, ws = 0;
+    State.objs.forEach(function(obj, oi){
+      var v = obj.dir === 'max' ? h.preds[obj.name].mu : -h.preds[obj.name].mu;
+      s += obj.weight * (v - loArr[oi]) / spanArr[oi];
+      ws += obj.weight;
+    });
+    return s / ws;
+  });
+  var w = 560, h = 180, pad = { l: 34, r: 12, t: 12, b: 24 };
+  var x0 = pad.l, y0 = pad.t, xw = w - pad.l - pad.r, yh = h - pad.t - pad.b;
+  var lo = Math.min.apply(null, bests), hi = Math.max.apply(null, bests);
+  var span = (hi - lo) || 1;
+  var inner = '';
+  for (var g = 0; g <= 4; g++){
+    var gy = y0 + yh - (g / 4) * yh;
+    inner += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + (x0 + xw) + '" y2="' + gy + '" stroke="#e6ebf3" stroke-width="1"/>';
+    inner += '<text x="' + (x0 - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="#8b98ad">' + (lo + span * g / 4).toFixed(2) + '</text>';
+  }
+  var pts = bests.map(function(b, i){
+    var px = x0 + (bests.length > 1 ? i / (bests.length - 1) : 0.5) * xw;
+    var py = y0 + yh - ((b - lo) / span) * yh;
+    return [px, py];
+  });
+  var line = pts.map(function(p){ return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+  inner += '<polyline points="' + line + '" fill="none" stroke="#0e9c94" stroke-width="2"/>';
+  pts.forEach(function(p){
+    inner += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="#0e9c94"/>';
+  });
+  inner += '<text x="' + (x0 + xw / 2) + '" y="' + (h - 6) + '" text-anchor="middle" font-size="10" fill="#8b98ad">迭代轮次 → 推荐预测合成得分（越高越好）</text>';
+  box.innerHTML = svgWrap(w, h, inner);
+}
+function drawPareto(){
+  var box = $('paretoChart');
+  if (State.objs.length !== 2){
+    box.innerHTML = '<div class="empty-tip">仅当恰好 2 个目标时显示 Pareto 前沿</div>';
+    return;
+  }
+  if (!State.rows.length && !(State._lastFrontier && State._lastFrontier.length)){
+    box.innerHTML = '<div class="empty-tip">暂无数据</div>';
+    return;
+  }
+  var o1 = State.objs[0], o2 = State.objs[1];
+  var w = 560, h = 240, pad = { l: 40, r: 14, t: 12, b: 30 };
+  var x0 = pad.l, y0 = pad.t, xw = w - pad.l - pad.r, yh = h - pad.t - pad.b;
+  var xVals = State.rows.map(function(r){ return +r.o[o1.name]; });
+  var yVals = State.rows.map(function(r){ return +r.o[o2.name]; });
+  var fx = [], fy = [];
+  if (State._lastFrontier && State._lastFrontier.length){
+    State._lastFrontier.forEach(function(f){
+      fx.push(+f.preds[o1.name].mu); fy.push(+f.preds[o2.name].mu);
+    });
+  }
+  var allX = xVals.concat(fx), allY = yVals.concat(fy);
+  var lo1 = Math.min.apply(null, allX), hi1 = Math.max.apply(null, allX);
+  var lo2 = Math.min.apply(null, allY), hi2 = Math.max.apply(null, allY);
+  var s1 = (hi1 - lo1) || 1, s2 = (hi2 - lo2) || 1;
+  var inner = '';
+  for (var g = 0; g <= 4; g++){
+    var gy = y0 + yh - (g / 4) * yh;
+    inner += '<line x1="' + x0 + '" y1="' + gy + '" x2="' + (x0 + xw) + '" y2="' + gy + '" stroke="#e6ebf3" stroke-width="1"/>';
+    inner += '<text x="' + (x0 - 6) + '" y="' + (gy + 3) + '" text-anchor="end" font-size="9" fill="#8b98ad">' + (lo2 + s2 * g / 4).toFixed(1) + '</text>';
+  }
+  for (var g2 = 0; g2 <= 4; g2++){
+    var gx = x0 + (g2 / 4) * xw;
+    inner += '<line x1="' + gx + '" y1="' + y0 + '" x2="' + gx + '" y2="' + (y0 + yh) + '" stroke="#e6ebf3" stroke-width="1"/>';
+    inner += '<text x="' + gx + '" y="' + (h - 10) + '" text-anchor="middle" font-size="9" fill="#8b98ad">' + (lo1 + s1 * g2 / 4).toFixed(1) + '</text>';
+  }
+  function px(v){ return x0 + (v - lo1) / s1 * xw; }
+  function py(v){ return y0 + yh - (v - lo2) / s2 * yh; }
+  // 代理模型 Pareto 前沿（橙点 + 阶梯线）
+  if (fx.length){
+    var pts = [];
+    for (var i = 0; i < fx.length; i++) pts.push([px(fx[i]), py(fy[i])]);
+    pts.sort(function(a, b){ return b[0] - a[0]; });
+    // 阶梯线：沿 x 递减时保留当前最大 y，形成右上包络
+    var env = [], curY = -Infinity;
+    for (var e = 0; e < pts.length; e++){
+      if (pts[e][1] > curY){
+        env.push(pts[e]);
+        curY = pts[e][1];
+      }
+    }
+    if (env.length > 1){
+      var line = env.map(function(p){ return p[0].toFixed(1) + ',' + p[1].toFixed(1); }).join(' ');
+      inner += '<polyline points="' + line + '" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-dasharray="5 3"/>';
+    }
+    env.forEach(function(p){
+      inner += '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="3" fill="#f59e0b" opacity=".9"/>';
+    });
+  }
+  // 已有实验数据点
+  State.rows.forEach(function(r){
+    var cx = px(+r.o[o1.name]), cy = py(+r.o[o2.name]);
+    inner += '<circle cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="4" fill="#2563eb" opacity=".85"/>';
+  });
+  // 本轮推荐点
+  if (State.history.length){
+    var last = State.history[State.history.length - 1];
+    var lx = px(last.preds[o1.name].mu), ly = py(last.preds[o2.name].mu);
+    inner += '<circle cx="' + lx.toFixed(1) + '" cy="' + ly.toFixed(1) + '" r="7" fill="none" stroke="#b45309" stroke-width="2"/>';
+    inner += '<text x="' + (lx + 8) + '" y="' + (ly - 6) + '" font-size="10" fill="#b45309">本轮推荐</text>';
+  }
+  inner += '<text x="' + (x0 + xw / 2) + '" y="' + (h - 6) + '" text-anchor="middle" font-size="10" fill="#8b98ad">' +
+    escapeHtml(o1.name) + '（' + (o1.dir === 'max' ? '越大越好' : '越小越好') + '） → ' + escapeHtml(o2.name) + '（' + (o2.dir === 'max' ? '越大越好' : '越小越好') + '）</text>';
+  box.innerHTML = svgWrap(w, h, inner);
+}
+
+/* ===== 预测面板 ===== */
+function renderPredictPanel(){
+  var html = '<div class="sec-title">输入参数（预测性能）</div><div class="add-form" style="margin-bottom:8px">';
+  State.params.forEach(function(prm, i){
+    html += '<div><label>' + escapeHtml(prm.name) + '</label>';
+    if (prm.type === 'num'){
+      var lastBest = State.history.length ? State.history[State.history.length - 1].params[prm.name] : '';
+      html += '<input type="number" step="any" data-pr-p="' + i + '" value="' + escapeHtml(lastBest === '' ? '' : lastBest) + '">';
+    } else {
+      html += '<select data-pr-p="' + i + '">' + prm.cats.map(function(c){ return '<option>' + escapeHtml(c) + '</option>'; }).join('') + '</select>';
+    }
+    html += '</div>';
+  });
+  html += '<div class="add-actions"><button class="btn primary" id="runPredBtn" type="button">执行预测</button></div></div>';
+  html += '<div class="rec-grid" id="predOut" style="margin-top:4px"></div>';
+  return html;
+}
+
+/* ===== 事件绑定与初始化 ===== */
+function setup(){
+  $('addParamBtn').addEventListener('click', function(){
+    State.params.push({ name: '参数' + (State.params.length + 1), type: 'num', min: 0, max: 10 });
+    renderParams(); renderAddForm(); renderTable();
+  });
+  $('addObjBtn').addEventListener('click', function(){
+    State.objs.push({ name: '目标' + (State.objs.length + 1), dir: 'max', weight: 1 });
+    renderObjs(); renderAddForm(); renderTable();
+  });
+  $('importBtn').addEventListener('click', function(){ $('fileInput').click(); });
+  $('fileInput').addEventListener('change', function(ev){
+    var f = ev.target.files[0];
+    if (!f) return;
+    var name = (f.name || '').toLowerCase();
+    var isXls = /\.(xlsx|xls)$/.test(name);
+    var reset = function(){ ev.target.value = ''; };
+    if (isXls){
+      // Excel 工作簿：用本地 SheetJS 库解析首个工作表 → 转成 CSV 文本走同一套导入逻辑
+      if (!window.XLSX){
+        toast('缺少 Excel 解析库：请保持 lib\\xlsx.full.min.js 与 HTML 在同一目录', true);
+        reset(); return;
+      }
+      var reader = new FileReader();
+      reader.onload = function(){
+        try {
+          var wb = XLSX.read(new Uint8Array(reader.result), { type: 'array' });
+          if (!wb.SheetNames.length){ toast('Excel 文件没有可读工作表', true); reset(); return; }
+          var ws = wb.Sheets[wb.SheetNames[0]];
+          if (!ws){ toast('Excel 工作表为空', true); reset(); return; }
+          var csvText = XLSX.utils.sheet_to_csv(ws, { FS: ',' });
+          importCsv(csvText);
+        } catch(e){
+          toast('Excel 解析失败：' + (e.message || e), true);
+        }
+        reset();
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      var reader = new FileReader();
+      reader.onload = function(){ importCsv(String(reader.result)); reset(); };
+      reader.readAsText(f, 'utf-8');
+    }
+  });
+  $('exportBtn').addEventListener('click', exportCsv);
+  $('pickTargetBtn').addEventListener('click', pickTarget);
+  $('resetBtn').addEventListener('click', function(){
+    demoData(); renderParams(); renderObjs(); renderTable(); renderAddForm();
+    renderHistory(); drawConv(); drawPareto();
+    $('resultCard').hidden = true;    toast('已恢复示例数据');
+  });
+  document.querySelectorAll('#modelOpts label').forEach(function(lb){
+    lb.addEventListener('click', function(){
+      document.querySelectorAll('#modelOpts label').forEach(function(x){ x.classList.remove('on'); });
+      lb.classList.add('on');
+    });
+  });
+  document.querySelector('input[name=model][value=gp]').parentElement.classList.add('on');
+  $('recommendBtn').addEventListener('click', recommendNow);
+  $('predictBtn').addEventListener('click', function(){
+    if (!State.params.length){ toast('请先添加参数', true); return; }
+    var box = $('predictPanel');
+    if (box){
+      box.remove();
+    } else {
+      var panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.id = 'predictPanel';
+      panel.innerHTML = renderPredictPanel();
+      var ops = document.querySelector('.ops');
+      var ref = $('resultCard');
+      ops.insertBefore(panel, ref);
+      $('runPredBtn').addEventListener('click', runPredict);
+    }
+  });
+  demoData();
+  renderParams(); renderObjs(); renderTable(); renderAddForm(); renderHistory();
+  drawConv(); drawPareto();
+  $('fillRecBtn').addEventListener('click', fillRecommendedParams);
+}
+
+/* 把最近一次推荐参数预填到「加入一次新实验」表单 */
+function fillRecommendedParams(){
+  var p = State._lastRecommended;
+  if (!p){ toast('还没有推荐结果', true); return; }
+  State.params.forEach(function(prm, i){
+    var el = document.querySelector('[data-af-p="' + i + '"]');
+    if (!el) return;
+    var v = p[prm.name];
+    if (v === undefined || v === null) return;
+    el.value = prm.type === 'num' ? v : String(v);
+  });
+  toast('已预填推荐参数，补填实测目标值后点「加入实验数据」即可迭代');
+}
+document.addEventListener('DOMContentLoaded', setup);
+
+</script>
+<script src="./lib/xlsx.full.min.js"></script>
+</body>
+</html>

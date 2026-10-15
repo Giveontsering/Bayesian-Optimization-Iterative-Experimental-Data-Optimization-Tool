@@ -1,0 +1,6 @@
+# 可选依赖：仅当使用 server/server.py（XGBoost/LightGBM 参考实现）时需要
+# 主应用（实验参数优化工具.html）为纯前端，无需任何 Python 依赖
+xgboost>=2.0
+lightgbm>=4.0
+scikit-learn>=1.0
+numpy>=1.21
